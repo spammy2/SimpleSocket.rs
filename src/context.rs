@@ -12,23 +12,33 @@ pub struct Context {
 	subscriptions: HashMap<i64, Subscription>
 }
 
-// got so tired of trying to get this to give the same result in rust, so just embed javascript and run it lmao
-// fuck you robot engine
-fn hash(text: &str) -> i32 {
-	let mut v = js_sandbox::Script::from_string(r#"
-	function hash(text) {
-		let hash = 0;
-		for (let i = 0; i < text.length; i++) {
-		  let char = text.charCodeAt(i);
-		  hash = ((hash << 5) - hash) + char;
-		  hash = hash & hash;
-		}
-		return hash;
-	  }
-	"#).expect("JS runs");
-	v.call("hash", &text).unwrap()
-}
+// fn hash(text: &str) -> i64 {
+// 	let mut hash: i64 = 0;
+// 	for c in text.chars(){
+// 		let char = c as i64;
+// 		let val = (
+// 			((hash as i32) << 5)
+// 			-
+// 			(hash as i32)
+// 		) as i64 + char;
+// 		hash = val & val;
+// 	}
+// 	hash
+// }
 
+fn hash(text: &str) -> i64 {
+	let mut hash: i64 = 0;
+	for c in text.chars(){
+		let char = c as i64;
+		let val = hash as i32;
+		let val = val << 5;
+		let val = val - (hash as i32);
+		let val = (val as i64) + char;
+		let val = val & val;
+		hash = val;
+	}
+	return hash;
+}
 
 impl Context {
 	pub fn new(sender: mpsc::Sender<String>) -> Self {
