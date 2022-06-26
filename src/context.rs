@@ -1,9 +1,9 @@
 use std::{cell::Cell, collections::HashMap};
 
 use serde_json::Value;
-use crate::client::subscription::SubscriptionHandle;
 
-use super::{subscription::Subscription, message::{SimpleSocketMessage, SubscribeMessage, EventResponse}};
+use crate::subscription::{Subscription, SubscriptionHandle}; 
+use crate::message::{SimpleSocketMessage, SubscribeMessage, EventResponse};
 use tokio::sync::mpsc;
 
 pub struct Context {
