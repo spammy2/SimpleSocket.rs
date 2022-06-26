@@ -1,4 +1,4 @@
-<img src="./simplesocketlogo.png" alt="SimpleSocketLogo" width=200>
+<img src="./SimpleSocketLogo.png" alt="SimpleSocketLogo" width=200>
 
 *So you don't have to touch that dirty shit that is javascript*
 
