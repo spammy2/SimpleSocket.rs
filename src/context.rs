@@ -1,16 +1,20 @@
+use std::sync::{Arc};
 use std::{cell::Cell, collections::HashMap};
 
 use serde_json::Value;
 
 use crate::subscription::{Subscription, SubscriptionHandle}; 
 use crate::message::{SimpleSocketMessage, SubscribeMessage, EventResponse};
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, RwLock, Mutex};
 
 pub struct Context {
 	pub sender: mpsc::Sender<String>,
-	req_num: Cell<u32>,
+	req_num: Mutex<u32>,
 	subscriptions: HashMap<i64, Subscription>
 }
+
+#[derive(Clone)]
+pub struct Dispatch(pub Arc<Context>);
 
 // fn hash(text: &str) -> i64 {
 // 	let mut hash: i64 = 0;
@@ -44,19 +48,19 @@ impl Context {
 	pub fn new(sender: mpsc::Sender<String>) -> Self {
 		Self {
 			sender,
-			req_num: Cell::new(0),
+			req_num: Mutex::new(0),
 			subscriptions: HashMap::new()
 		}
 	}
 	pub(crate) fn send(&self, thing: impl SimpleSocketMessage) -> u32 {
-		let num  = self.req_num.get();
-		let (sent, message) = thing.to_shitty_json_array(num);
+		let mut num  = self.req_num.try_lock().unwrap();
+		let (sent, message) = thing.to_shitty_json_array(num.to_owned());
 		let tx = self.sender.clone(); // ???
 		println!("send {message}");
 		tokio::spawn(async move {
 			tx.send(message).await.unwrap();
 		});
-		self.req_num.set(num + 1);
+		*num += 1;
 		return sent;
 	}
 
@@ -70,7 +74,7 @@ impl Context {
 	// 	todo!();
 	// }
 
-	pub fn subscribe<C: Fn(Value) + 'static>(&mut self, filter: Value, callback: C) -> SubscriptionHandle {
+	pub fn subscribe<C: Fn(Value) + 'static + Send + Sync>(&mut self, filter: Value, callback: C) -> SubscriptionHandle {
 		let hash = hash(&serde_json::to_string(&filter).unwrap()).into();
 		println!("hash {}", hash);
 		let req_id = self.send(SubscribeMessage {

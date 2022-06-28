@@ -5,7 +5,7 @@ use super::{Context, message::EditMessage};
 
 pub(crate) struct Subscription {
     pub hash: i64,
-    pub callback: Box<dyn Fn(Value)>,
+    pub callback: Box<dyn Fn(Value) + Send + Sync + 'static>,
     pub filter: Value,
 }
 

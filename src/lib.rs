@@ -1,12 +1,15 @@
 pub mod context;
 pub mod subscription;
 pub mod message;
+use std::sync::Arc;
+
+use context::Dispatch;
 use message::{ConnectMessage, ConnectedResponse, ServerResponse};
 
 pub use context::Context;
 use futures::{SinkExt, StreamExt};
 use serde_json::json;
-use tokio::sync::mpsc::channel;
+use tokio::sync::{mpsc::channel, RwLock};
 use tokio_tungstenite::tungstenite::Message;
 const WEBSOCKET_URL: &str = "wss://simplesocket.net:32560/socket/v2?en=etf";
 // const WEBSOCKET_URL: &str = "ws://localhost:12345";
@@ -21,7 +24,7 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
     
     let (tx, mut rx) = channel::<String>(10);
     
-    let mut context = Context::new(tx);
+    let context = Arc::new(Context::new(tx));
 
     context.send(ConnectMessage {
         id: project_id,
@@ -39,7 +42,7 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
                                 let a: ServerResponse = ServerResponse::from_bytes(&x).unwrap();
                                 match a {
                                     ServerResponse::Connected(b)=>{
-                                        events.on_ready(&mut context, b);
+                                        events.on_ready(Dispatch(context.clone()), b);
                                     },
                                     ServerResponse::Message(b)=>{
                                         println!("mesg {:#?}", b.data);
@@ -70,7 +73,8 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
     }
 }
 
-pub trait Events {
-    fn on_ready(&mut self, context: &mut Context, connected: ConnectedResponse);
-    fn on_close(&mut self, context: &mut Context);
+#[async_trait::async_trait]
+pub trait Events: Send + Sync {
+    async fn on_ready(&mut self, context: Dispatch, connected: ConnectedResponse);
+    async fn on_close(&mut self, context: Dispatch);
 }
