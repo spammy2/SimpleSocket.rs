@@ -2,7 +2,8 @@
 name = "simplesocket"
 version = "0.1.0"
 edition = "2021"
-
+license-file = "LICENSE.md"
+description = "Implementation of Robot_Engine's SimpleSocket in rust."
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
