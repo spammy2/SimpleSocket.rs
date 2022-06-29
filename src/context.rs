@@ -1,6 +1,7 @@
 use std::sync::{Arc};
 use std::{cell::Cell, collections::HashMap};
 
+use serde::Serialize;
 use serde_json::Value;
 
 use crate::subscription::{Subscription, SubscriptionHandle}; 
@@ -10,7 +11,7 @@ use tokio::sync::{mpsc, RwLock, Mutex};
 pub struct Context {
 	pub sender: mpsc::Sender<String>,
 	req_num: Mutex<u32>,
-	subscriptions: HashMap<i64, Subscription>
+	subscriptions: Mutex<HashMap<i64, Subscription>>
 }
 
 #[derive(Clone)]
@@ -34,14 +35,25 @@ fn hash(text: &str) -> i64 {
 	let mut hash: i64 = 0;
 	for c in text.chars(){
 		let char = c as i64;
-		let val = hash as i32;
-		let val = val << 5;
-		let val = val - (hash as i32);
-		let val = (val as i64) + char;
-		let val = val & val;
-		hash = val;
+		// println!("1 {char}");
+		let val = hash;
+		// println!("2 {val}");
+		let val = (val as i32) << 5;
+		// println!("3 {val}");
+		let val = (val as i64) - hash;
+		// println!("4 {val}");
+		let val = val + char;
+		// println!("5 {val}");
+		let val = (val as i32) & (val as i32);
+		// println!("6 {val}");
+		hash = val as i64;
 	}
 	return hash;
+}
+
+#[test]
+fn test_hash(){
+	println!("{}", hash("this shit has never failed to piss me off"));
 }
 
 impl Context {
@@ -49,14 +61,13 @@ impl Context {
 		Self {
 			sender,
 			req_num: Mutex::new(0),
-			subscriptions: HashMap::new()
+			subscriptions: Mutex::new(HashMap::new())
 		}
 	}
 	pub(crate) fn send(&self, thing: impl SimpleSocketMessage) -> u32 {
 		let mut num  = self.req_num.try_lock().unwrap();
 		let (sent, message) = thing.to_shitty_json_array(num.to_owned());
 		let tx = self.sender.clone(); // ???
-		println!("send {message}");
 		tokio::spawn(async move {
 			tx.send(message).await.unwrap();
 		});
@@ -64,9 +75,14 @@ impl Context {
 		return sent;
 	}
 
-	pub (crate) fn on_message(&self, message: EventResponse) {
-		if let Some(subscription) = self.subscriptions.get(&message.hash) {
-			(subscription.callback)(message.data);
+	pub (crate) async fn on_message(&self, message: EventResponse) {
+		let lock = self.subscriptions.lock().await;
+		if let Some(subscription) = lock.get(&message.hash) {
+			let cb = subscription.callback.clone();
+			drop(lock);
+			(cb)(message.data);
+		} else {
+			drop(lock);
 		}
 	}
 
@@ -74,9 +90,9 @@ impl Context {
 	// 	todo!();
 	// }
 
-	pub fn subscribe<C: Fn(Value) + 'static + Send + Sync>(&mut self, filter: Value, callback: C) -> SubscriptionHandle {
-		let hash = hash(&serde_json::to_string(&filter).unwrap()).into();
-		println!("hash {}", hash);
+	pub async fn subscribe<C: Fn(Value) + 'static + Send + Sync>(&self, filter: impl Serialize, callback: C) -> SubscriptionHandle {
+		let filter: Value = serde_json::to_value(&filter).unwrap();
+		let hash = hash(&filter.to_string()).into();
 		let req_id = self.send(SubscribeMessage {
 			unknown_param: true,
 			filter: filter.clone(),
@@ -84,9 +100,11 @@ impl Context {
 		let sub = Subscription {
 			filter,
 			hash, 
-			callback: Box::new(callback),
+			callback: Arc::new(Box::new(callback)),
 		};
-		self.subscriptions.insert(hash, sub);
+		let mut lock = self.subscriptions.lock().await;
+		lock.insert(hash, sub);
+		drop(lock);
 		SubscriptionHandle {
 			hash,
 			req_id,

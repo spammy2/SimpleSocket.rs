@@ -42,11 +42,10 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
                                 let a: ServerResponse = ServerResponse::from_bytes(&x).unwrap();
                                 match a {
                                     ServerResponse::Connected(b)=>{
-                                        events.on_ready(Dispatch(context.clone()), b);
+                                        events.on_ready(Dispatch(context.clone()), b).await;
                                     },
                                     ServerResponse::Message(b)=>{
-                                        println!("mesg {:#?}", b.data);
-                                        context.on_message(b);
+                                        context.on_message(b).await;
                                     }
                                 }
                             },
@@ -62,6 +61,7 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
             msg=rx.recv()=>{
                 match msg {
                     Some(msg)=>{
+                        // println!("sending {:?}", msg);
                         sender.send(Message::Text(msg)).await.expect("bruh");
                     },
                     None => {
