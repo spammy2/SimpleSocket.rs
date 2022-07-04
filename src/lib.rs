@@ -3,7 +3,6 @@ pub mod subscription;
 pub mod message;
 use std::sync::Arc;
 
-use context::Dispatch;
 use message::{ConnectMessage, ConnectedResponse, ServerResponse};
 
 pub use context::Context;
@@ -42,7 +41,7 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
                                 let a: ServerResponse = ServerResponse::from_bytes(&x).unwrap();
                                 match a {
                                     ServerResponse::Connected(b)=>{
-                                        events.on_ready(Dispatch(context.clone()), b).await;
+                                        events.on_ready(context.clone(), b).await;
                                     },
                                     ServerResponse::Message(b)=>{
                                         context.on_message(b).await;
@@ -74,7 +73,7 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
 }
 
 #[async_trait::async_trait]
-pub trait Events: Send + Sync {
-    async fn on_ready(&mut self, context: Dispatch, connected: ConnectedResponse);
-    async fn on_close(&mut self, context: Dispatch);
+pub trait Events {
+    async fn on_ready(&self, context: Arc<Context>, connected: ConnectedResponse);
+    async fn on_close(&self, context: Arc<Context>);
 }

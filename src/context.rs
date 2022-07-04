@@ -1,6 +1,7 @@
 use std::sync::{Arc};
 use std::{cell::Cell, collections::HashMap};
 
+use futures::Future;
 use serde::Serialize;
 use serde_json::Value;
 
@@ -13,9 +14,6 @@ pub struct Context {
 	req_num: Mutex<u32>,
 	subscriptions: Mutex<HashMap<i64, Subscription>>
 }
-
-#[derive(Clone)]
-pub struct Dispatch(pub Arc<Context>);
 
 // fn hash(text: &str) -> i64 {
 // 	let mut hash: i64 = 0;
@@ -56,6 +54,11 @@ fn test_hash(){
 	println!("{}", hash("this shit has never failed to piss me off"));
 }
 
+// Thank you https://github.com/lpxxn/rust-design-pattern/blob/master/behavioral/observer.rs
+pub trait Subscriber {
+	fn callback(&self, value: Value);
+}
+
 impl Context {
 	pub fn new(sender: mpsc::Sender<String>) -> Self {
 		Self {
@@ -78,9 +81,9 @@ impl Context {
 	pub (crate) async fn on_message(&self, message: EventResponse) {
 		let lock = self.subscriptions.lock().await;
 		if let Some(subscription) = lock.get(&message.hash) {
-			let cb = subscription.callback.clone();
+			let subscriber = subscription.callback.clone();
 			drop(lock);
-			(cb)(message.data);
+			subscriber.callback(message.data);
 		} else {
 			drop(lock);
 		}
@@ -90,7 +93,7 @@ impl Context {
 	// 	todo!();
 	// }
 
-	pub async fn subscribe<C: Fn(Value) + 'static + Send + Sync>(&self, filter: impl Serialize, callback: C) -> SubscriptionHandle {
+	pub async fn subscribe(&self, filter: impl Serialize, callback: impl Subscriber + 'static + Send + Sync) -> SubscriptionHandle {
 		let filter: Value = serde_json::to_value(&filter).unwrap();
 		let hash = hash(&filter.to_string()).into();
 		let req_id = self.send(SubscribeMessage {

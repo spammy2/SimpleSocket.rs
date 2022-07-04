@@ -1,13 +1,16 @@
 use std::sync::Arc;
 
+use futures::Future;
 use serde::Serialize;
 use serde_json::Value;
+
+use crate::context::Subscriber;
 
 use super::{Context, message::EditMessage};
 
 pub(crate) struct Subscription {
     pub hash: i64,
-    pub callback: Arc<Box<dyn Fn(Value) + Send + Sync + 'static>>,
+    pub callback: Arc<Box<dyn Subscriber + 'static + Send + Sync>>,
     pub filter: Value,
 }
 
