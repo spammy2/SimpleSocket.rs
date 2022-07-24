@@ -12,6 +12,7 @@ use tokio::sync::{mpsc, RwLock, Mutex};
 pub struct Context {
 	pub sender: mpsc::Sender<String>,
 	req_num: Mutex<u32>,
+	pub secure_id: Mutex<Option<String>>,
 	subscriptions: Mutex<HashMap<i64, Subscription>>
 }
 
@@ -63,6 +64,7 @@ impl Context {
 	pub fn new(sender: mpsc::Sender<String>) -> Self {
 		Self {
 			sender,
+			secure_id: Mutex::from(None),
 			req_num: Mutex::new(0),
 			subscriptions: Mutex::new(HashMap::new())
 		}
@@ -76,6 +78,11 @@ impl Context {
 		});
 		*num += 1;
 		return sent;
+	}
+
+	pub fn get_secure_id(&self) -> String {
+		// ???
+		self.secure_id.try_lock().unwrap().as_ref().unwrap().clone()
 	}
 
 	pub (crate) async fn on_message(&self, message: EventResponse) {
