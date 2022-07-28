@@ -1,26 +1,47 @@
 use serde::{Serialize, Deserialize, de::{Visitor, Error}};
 use serde_json::{json, Value};
 
+#[derive(Debug)]
 pub struct ConnectedResponse {
 	pub client_id: String,
 	pub server_id: String,
 	pub secure_id: String,
 }
 
+#[derive(Debug)]
 pub struct EventResponse {
 	pub hash: i64,
 	pub data: Value,
 }
 
+#[derive(Debug)]
+pub struct RemoteResponse {
+	pub hash: i64,
+	pub data: Value,
+	pub name: String,
+	/// usually null, do not use
+	pub extra: Value,
+}
+
 pub enum ServerResponse {
 	Connected(ConnectedResponse),
 	Message(EventResponse),
+	Remote(RemoteResponse)
 }
 
 impl ServerResponse {
 	pub fn from_bytes(msg: &[u8]) -> Result<Self, String> {
 		let val: Value = serde_json::from_slice(&[b"[", msg, b"]"].concat()).map_err(|e| e.to_string())?;
 		let arr = val.as_array().ok_or("not an array")?;
+		let remote = val[4].as_str();
+		if let Some(remote) = remote {
+			return Ok(ServerResponse::Remote(RemoteResponse{
+				hash: arr[1].as_i64().ok_or("not an int")?,
+				data: arr[2].clone(),
+				extra: arr[3].clone(),
+				name: remote.to_string()
+			}))
+		}
 		match arr[0].as_u64().ok_or("not int")? {
 			1=>{
 				return Ok(ServerResponse::Connected(ConnectedResponse {

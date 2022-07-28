@@ -3,7 +3,7 @@ pub mod subscription;
 pub mod message;
 use std::sync::Arc;
 
-use message::{ConnectMessage, ConnectedResponse, ServerResponse};
+use message::{ConnectMessage, ConnectedResponse, ServerResponse, RemoteResponse};
 
 pub use context::Context;
 use futures::{SinkExt, StreamExt};
@@ -46,6 +46,9 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
 									},
 									ServerResponse::Message(b)=>{
 										context.on_message(b).await;
+									},
+									ServerResponse::Remote(b)=>{
+										events.on_remote(context.clone(), b).await;
 									}
 								}
 							},
@@ -77,4 +80,5 @@ pub async fn connect_socket(project_id: &'static str, token: &'static str, mut e
 pub trait Events {
 	async fn on_ready(&self, context: Arc<Context>, connected: ConnectedResponse);
 	async fn on_close(&self, context: Arc<Context>);
+	async fn on_remote(&self, context: Arc<Context>, remote: RemoteResponse);
 }
