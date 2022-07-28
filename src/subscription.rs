@@ -15,6 +15,7 @@ pub(crate) struct Subscription {
 }
 
 
+#[derive(Clone,Copy)]
 pub struct SubscriptionHandle {
     pub(crate)hash: i64,
     pub(crate)req_id: u32,
